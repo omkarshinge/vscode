@@ -134,6 +134,17 @@ steps:
     displayName: Generate Group Policy definitions
     condition: and(succeeded(), ne(variables['VSCODE_PUBLISH'], 'false'))
 
+  - ${{ if ne(parameters.VSCODE_QUALITY, 'oss') }}:
+    - powershell: |
+        . build/azure-pipelines/win32/exec.ps1
+        $ErrorActionPreference = "Stop"
+        $env:VSCODE_EXPLORER_APPX_DIR=$(Join-Path $pwd.Path "resources/win32/appx")
+        exec { node build/win32/explorer-appx-fetcher }
+      env:
+        VSCODE_ARCH: "$(VSCODE_ARCH)"
+      displayName: Download Explorer Sparse Package
+      condition: and(succeeded(), ne(variables['VSCODE_PUBLISH'], 'false'))
+
   - powershell: |
       . build/azure-pipelines/win32/exec.ps1
       $ErrorActionPreference = "Stop"
@@ -202,6 +213,7 @@ steps:
         . build/azure-pipelines/win32/exec.ps1
         $ErrorActionPreference = "Stop"
         exec { node build\azure-pipelines\common\sign $env:EsrpCliDllPath windows $(ESRP-PKI) $(esrp-aad-username) $(esrp-aad-password) $(CodeSigningFolderPath) '*.dll,*.exe,*.node' }
+        exec { node build\azure-pipelines\common\sign $env:EsrpCliDllPath windows-appx $(ESRP-PKI) $(esrp-aad-username) $(esrp-aad-password) $(CodeSigningFolderPath) '*.appx' }
       displayName: Codesign
 
   - ${{ if eq(parameters.VSCODE_PUBLISH, true) }}:
