@@ -834,8 +834,15 @@ export class SettingsEditor2 extends EditorPane {
 		}));
 	}
 
-	private createSettingsTree(container: HTMLElement): void {
+	private onApplyFilter(filter: string) {
+		if (this.searchWidget && !this.searchWidget.getValue().includes(filter)) {
+			// Prepend the filter to the query.
+			const newQuery = `${filter} ${this.searchWidget.getValue().trimStart()}`;
+			this.focusSearch(newQuery, false);
+		}
+	}
 
+	private createSettingsTree(container: HTMLElement): void {
 		this.settingRenderers = this.instantiationService.createInstance(SettingTreeRenderers);
 		this._register(this.settingRenderers.onDidChangeSetting(e => this.onDidChangeSetting(e.key, e.value, e.type, e.manualReset)));
 		this._register(this.settingRenderers.onDidOpenSettings(settingKey => {
@@ -847,17 +854,6 @@ export class SettingsEditor2 extends EditorPane {
 			this._currentFocusContext = SettingsFocusContext.SettingControl;
 			this.settingRowFocused.set(false);
 		}));
-		this._register(this.settingRenderers.onDidClickOverrideElement((element: ISettingOverrideClickEvent) => {
-			if (element.scope.toLowerCase() === 'workspace') {
-				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.WORKSPACE);
-			} else if (element.scope.toLowerCase() === 'user') {
-				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.USER_LOCAL);
-			} else if (element.scope.toLowerCase() === 'remote') {
-				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.USER_REMOTE);
-			}
-
-			this.searchWidget.setValue(element.targetKey);
-		}));
 		this._register(this.settingRenderers.onDidChangeSettingHeight((params: HeightChangeParams) => {
 			const { element, height } = params;
 			try {
@@ -866,12 +862,21 @@ export class SettingsEditor2 extends EditorPane {
 				// the element was not found
 			}
 		}));
-		this._register(this.settingRenderers.onApplyFilter((filter: string) => {
-			if (this.searchWidget && !this.searchWidget.getValue().includes(filter)) {
-				// Prepend the filter to the query.
-				const newQuery = `${filter} ${this.searchWidget.getValue().trimStart()}`;
-				this.focusSearch(newQuery, false);
+		this._register(this.settingRenderers.onApplyFilter((filter) => this.onApplyFilter(filter)));
+		this._register(this.settingRenderers.onDidClickOverrideElement((element: ISettingOverrideClickEvent) => {
+			if (element.scope.startsWith(`@${LANGUAGE_SETTING_TAG}`)) {
+				this.onApplyFilter(element.scope);
+				return;
 			}
+
+			if (element.scope.toLowerCase() === 'workspace') {
+				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.WORKSPACE);
+			} else if (element.scope.toLowerCase() === 'user') {
+				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.USER_LOCAL);
+			} else if (element.scope.toLowerCase() === 'remote') {
+				this.settingsTargetsWidget.updateTarget(ConfigurationTarget.USER_REMOTE);
+			}
+			this.onApplyFilter(`@${ID_SETTING_TAG}${element.targetKey}`);
 		}));
 
 		this.settingsTree = this._register(this.instantiationService.createInstance(SettingsTree,

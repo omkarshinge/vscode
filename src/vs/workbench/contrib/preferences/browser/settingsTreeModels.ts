@@ -11,7 +11,7 @@ import { localize } from 'vs/nls';
 import { ConfigurationTarget, IConfigurationValue } from 'vs/platform/configuration/common/configuration';
 import { SettingsTarget } from 'vs/workbench/contrib/preferences/browser/preferencesWidgets';
 import { ITOCEntry, knownAcronyms, knownTermMappings, tocData } from 'vs/workbench/contrib/preferences/browser/settingsLayout';
-import { ENABLE_LANGUAGE_FILTER, MODIFIED_SETTING_TAG, POLICY_SETTING_TAG, REQUIRE_TRUSTED_WORKSPACE_SETTING_TAG } from 'vs/workbench/contrib/preferences/common/preferences';
+import { ENABLE_LANGUAGE_FILTER, LANGUAGE_SETTING_TAG, MODIFIED_SETTING_TAG, POLICY_SETTING_TAG, REQUIRE_TRUSTED_WORKSPACE_SETTING_TAG } from 'vs/workbench/contrib/preferences/common/preferences';
 import { IExtensionSetting, ISearchResult, ISetting, SettingValueType } from 'vs/workbench/services/preferences/common/preferences';
 import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/common/environmentService';
 import { FOLDER_SCOPES, WORKSPACE_SCOPES, REMOTE_MACHINE_SCOPES, LOCAL_MACHINE_SCOPES, IWorkbenchConfigurationService } from 'vs/workbench/services/configuration/common/configuration';
@@ -197,6 +197,24 @@ export class SettingsTreeSettingElement extends SettingsTreeElement {
 		this._displayCategory = displayKeyFormat.category;
 	}
 
+	/**
+	 * Determines whether we need to add more items to the overridden scope list.
+	 */
+	private checkTargetSelector(overriddenScopeList: string[], targetSelector: string, inspected: IConfigurationValue<unknown>, languageSelector?: string) {
+		// We might want to eventually append ` [${languageName}]` to the scope string.
+		// For now, append nothing.
+		const languageSelectorSuffix = '';
+		if (targetSelector !== 'workspaceValue' && typeof inspected.workspaceValue !== 'undefined') {
+			overriddenScopeList.push(localize('workspace', "Workspace") + languageSelectorSuffix);
+		}
+		if (targetSelector !== 'userRemoteValue' && typeof inspected.userRemoteValue !== 'undefined') {
+			overriddenScopeList.push(localize('remote', "Remote") + languageSelectorSuffix);
+		}
+		if (targetSelector !== 'userLocalValue' && typeof inspected.userLocalValue !== 'undefined') {
+			overriddenScopeList.push(localize('user', "User") + languageSelectorSuffix);
+		}
+	}
+
 	update(inspectResult: IInspectResult, isWorkspaceTrusted: boolean): void {
 		let { isConfigured, inspected, targetSelector, inspectedLanguageOverrides, languageSelector } = inspectResult;
 
@@ -209,22 +227,25 @@ export class SettingsTreeSettingElement extends SettingsTreeElement {
 
 		let displayValue = isConfigured ? inspected[targetSelector] : inspected.defaultValue;
 		const overriddenScopeList: string[] = [];
-		if (targetSelector !== 'workspaceValue' && typeof inspected.workspaceValue !== 'undefined') {
-			overriddenScopeList.push(localize('workspace', "Workspace"));
-		}
 
-		if (targetSelector !== 'userRemoteValue' && typeof inspected.userRemoteValue !== 'undefined') {
-			overriddenScopeList.push(localize('remote', "Remote"));
-		}
-
-		if (targetSelector !== 'userLocalValue' && typeof inspected.userLocalValue !== 'undefined') {
-			overriddenScopeList.push(localize('user', "User"));
+		if (!languageSelector) {
+			this.checkTargetSelector(overriddenScopeList, targetSelector, inspected);
+		} else {
+			const inspected = inspectedLanguageOverrides.get(languageSelector);
+			if (inspected) {
+				this.checkTargetSelector(overriddenScopeList, targetSelector, inspected, languageSelector);
+			}
 		}
 
 		if (inspected.overrideIdentifiers) {
 			for (const overrideIdentifier of inspected.overrideIdentifiers) {
 				const inspectedOverride = inspectedLanguageOverrides.get(overrideIdentifier);
 				if (inspectedOverride) {
+					if (overrideIdentifier !== languageSelector) {
+						// Only push in the language override if it's not the language
+						// we're currently filtered to.
+						overriddenScopeList.push(`@${LANGUAGE_SETTING_TAG}${overrideIdentifier}`);
+					}
 					this.languageOverrideValues.set(overrideIdentifier, inspectedOverride);
 				}
 			}

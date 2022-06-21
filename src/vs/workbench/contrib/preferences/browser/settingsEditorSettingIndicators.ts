@@ -6,15 +6,17 @@
 import * as DOM from 'vs/base/browser/dom';
 import { IMouseEvent } from 'vs/base/browser/mouseEvent';
 import { IHoverDelegate, IHoverDelegateOptions } from 'vs/base/browser/ui/iconLabel/iconHoverDelegate';
-import { ITooltipMarkdownString, IUpdatableHoverOptions, setupCustomHover } from 'vs/base/browser/ui/iconLabel/iconLabelHover';
+import { ICustomHover, ITooltipMarkdownString, IUpdatableHoverOptions, setupCustomHover } from 'vs/base/browser/ui/iconLabel/iconLabelHover';
 import { SimpleIconLabel } from 'vs/base/browser/ui/iconLabel/simpleIconLabel';
 import { Emitter } from 'vs/base/common/event';
 import { DisposableStore } from 'vs/base/common/lifecycle';
+import { ILanguageService } from 'vs/editor/common/languages/language';
 import { localize } from 'vs/nls';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { getIgnoredSettings } from 'vs/platform/userDataSync/common/settingsMerge';
 import { getDefaultIgnoredSettings, IUserDataSyncEnablementService } from 'vs/platform/userDataSync/common/userDataSync';
 import { SettingsTreeSettingElement } from 'vs/workbench/contrib/preferences/browser/settingsTreeModels';
+import { LANGUAGE_SETTING_TAG } from 'vs/workbench/contrib/preferences/common/preferences';
 import { IHoverService } from 'vs/workbench/services/hover/browser/hover';
 
 const $ = DOM.$;
@@ -39,7 +41,8 @@ export class SettingsTreeIndicatorsLabel {
 		container: HTMLElement,
 		@IConfigurationService configurationService: IConfigurationService,
 		@IHoverService hoverService: IHoverService,
-		@IUserDataSyncEnablementService private readonly userDataSyncEnablementService: IUserDataSyncEnablementService) {
+		@IUserDataSyncEnablementService private readonly userDataSyncEnablementService: IUserDataSyncEnablementService,
+		@ILanguageService private readonly languageService: ILanguageService) {
 		this.indicatorsContainerElement = DOM.append(container, $('.misc-label'));
 		this.indicatorsContainerElement.style.display = 'inline';
 
@@ -105,6 +108,15 @@ export class SettingsTreeIndicatorsLabel {
 		this.render();
 	}
 
+	private getScopeDisplayText(scope: string): string {
+		if (scope.includes(LANGUAGE_SETTING_TAG)) {
+			const colonIndex = scope.indexOf(':');
+			const id = scope.substring(colonIndex + 1);
+			return this.languageService.getLanguageName(id) ?? id;
+		}
+		return scope;
+	}
+
 	updateScopeOverrides(element: SettingsTreeSettingElement, elementDisposables: DisposableStore, onDidClickOverrideElement: Emitter<ISettingOverrideClickEvent>) {
 		this.scopeOverridesElement.innerText = '';
 		this.scopeOverridesElement.style.display = 'none';
@@ -118,7 +130,7 @@ export class SettingsTreeIndicatorsLabel {
 				this.scopeOverridesLabel.text = `${prefaceText}: `;
 
 				const firstScope = element.overriddenScopeList[0];
-				const view = DOM.append(this.scopeOverridesElement, $('a.modified-scope', undefined, firstScope));
+				const view = DOM.append(this.scopeOverridesElement, $('a.modified-scope', undefined, this.getScopeDisplayText(firstScope)));
 				elementDisposables.add(
 					DOM.addStandardDisposableListener(view, DOM.EventType.CLICK, (e: IMouseEvent) => {
 						onDidClickOverrideElement.fire({
@@ -142,8 +154,9 @@ export class SettingsTreeIndicatorsLabel {
 				let contentMarkdownString = prefaceText;
 				let contentFallback = prefaceText;
 				for (const scope of element.overriddenScopeList) {
-					contentMarkdownString += `\n- [${scope}](${scope})`;
-					contentFallback += `\n• ${scope}`;
+					const scopeDisplayText = this.getScopeDisplayText(scope);
+					contentMarkdownString += `\n- [${scopeDisplayText}](${scope})`;
+					contentFallback += `\n• ${scopeDisplayText}`;
 				}
 				const content: ITooltipMarkdownString = {
 					markdown: {
@@ -153,15 +166,17 @@ export class SettingsTreeIndicatorsLabel {
 					},
 					markdownNotSupportedFallback: contentFallback
 				};
+				let hover: ICustomHover | undefined = undefined;
 				const options: IUpdatableHoverOptions = {
 					linkHandler: (scope: string) => {
 						onDidClickOverrideElement.fire({
 							targetKey: element.setting.key,
 							scope
 						});
+						hover!.dispose();
 					}
 				};
-				setupCustomHover(this.hoverDelegate, this.scopeOverridesElement, content, options);
+				hover = setupCustomHover(this.hoverDelegate, this.scopeOverridesElement, content, options);
 			}
 		}
 		this.render();
