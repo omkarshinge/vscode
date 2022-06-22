@@ -125,14 +125,15 @@ export class Action extends Disposable implements IAction {
 	}
 
 	set enabled(value: boolean) {
-		this._setEnabled(value);
+		this.setEnabled(value);
 	}
 
-	protected _setEnabled(value: boolean): void {
+	public setEnabled(value: boolean): this {
 		if (this._enabled !== value) {
 			this._enabled = value;
 			this._onDidChange.fire({ enabled: value });
 		}
+		return this;
 	}
 
 	get checked(): boolean | undefined {
@@ -140,14 +141,15 @@ export class Action extends Disposable implements IAction {
 	}
 
 	set checked(value: boolean | undefined) {
-		this._setChecked(value);
+		this.setChecked(value);
 	}
 
-	protected _setChecked(value: boolean | undefined): void {
+	public setChecked(value: boolean | undefined): this {
 		if (this._checked !== value) {
 			this._checked = value;
 			this._onDidChange.fire({ checked: value });
 		}
+		return this;
 	}
 
 	async run(event?: unknown, data?: ITelemetryData): Promise<void> {

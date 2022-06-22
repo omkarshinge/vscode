@@ -81,13 +81,13 @@ export class ActivityAction extends Action {
 
 	activate(): void {
 		if (!this.checked) {
-			this._setChecked(true);
+			this.setChecked(true);
 		}
 	}
 
 	deactivate(): void {
 		if (this.checked) {
-			this._setChecked(false);
+			this.setChecked(false);
 		}
 	}
 
